@@ -23,7 +23,10 @@
 
 #include "enc28j60.h"
 #include <avr/io.h>
-
+#if DEBUG
+    #include "uart.h"
+#endif
+#include <stdlib.h>
 
 u08 Enc28j60Bank;
 u16 NextPacketPtr;
@@ -31,7 +34,7 @@ u16 NextPacketPtr;
 #define ENC28J60_CONTROL_DDR	DDRD
 #define ENC28J60_CONTROL_CS		4
 
-#define F_CPU        	8000000               		/* Processor Speed */
+//#define F_CPU        	8000000               		/* Processor Speed */
 #define CYCLES_PER_US 	((F_CPU+500000)/1000000) 	/* cpu cycles per microsecond */
 
 void delay(unsigned short us) 
@@ -58,9 +61,6 @@ void nicSetMacAddress(u08* macaddr)
 }
 
 
-
-
-
 u08 enc28j60ReadOp(u08 op, u08 address)
 {
 	u08 data;
@@ -85,6 +85,19 @@ u08 enc28j60ReadOp(u08 op, u08 address)
 	// release CS
 	ENC28J60_CONTROL_PORT |= (1<<ENC28J60_CONTROL_CS);
 
+#if DEBUG
+    uart_puts("ReadOp: addr=0x");
+    char buf[8];
+    utoa(address, buf, 16);
+    uart_puts(buf);
+    uart_puts("  op=0x");
+    utoa(op, buf, 1);
+    uart_puts(buf);
+    uart_puts("  data=0x");
+    utoa(data, buf, 16);
+    uart_puts(buf);
+    uart_puts("\r\n");
+#endif
 	return data;
 }
 
@@ -102,6 +115,19 @@ void enc28j60WriteOp(u08 op, u08 address, u08 data)
 
 	// release CS
 	ENC28J60_CONTROL_PORT |= (1<<ENC28J60_CONTROL_CS);
+#if DEBUG
+    uart_puts("WriteOp: addr=0x");
+    char buf[32];
+    utoa(address, buf, 16);
+    uart_puts(buf);
+    uart_puts("   op=0x");
+    utoa(op, buf, 16);
+    uart_puts(buf);
+    uart_puts("   data=0x");
+    utoa(data, buf, 16);
+    uart_puts(buf);
+    uart_puts("\r\n");
+#endif
 }
 
 void enc28j60ReadBuffer(u16 len, u08* data)
@@ -198,7 +224,7 @@ void enc28j60Init(void)
 	DDRB  &= ~(1<<PB4); // miso input
 	
 	// initialize SPI interface
-	// master mode und /2x takt (klappt auch wenn der mega8 mit 16mhz läuft !!)
+	// master mode und /2x takt (klappt auch wenn der mega8 mit 16mhz lÃ¤uft !!)
 	SPCR |= 1<<MSTR | 1<<SPE;
 	SPSR |= 1<<SPI2X;
 	

@@ -8,9 +8,9 @@ volatile unsigned char mymac[6] = {0xab,0xbc,0x6f,0x55,0x1c,0xc2};
 
 /*#######################################################
 # Funktion um die Checksumme zu berechnen, stammt 		#
-# ursprünglich von										#
+# ursprÃ¼nglich von										#
 # Ulrich Radig :-),www.ulrichradig.de 					#
-# wer genaueres zur Checksummenbildung wissen möchte:	#
+# wer genaueres zur Checksummenbildung wissen mÃ¶chte:	#
 # http://www.netfor2.com/udpsum.htm 	 				#
 ########################################################*/
 int checksum (unsigned char * pointer,unsigned long result32,unsigned int result16)
@@ -32,7 +32,7 @@ int checksum (unsigned char * pointer,unsigned long result32,unsigned int result
 		result16_1 = ((DataH << 8)+DataL);
 		//Addiert packet mit vorherigen
 		result32 = result32 + result16_1;
-		//decrimiert Länge von TCP Headerschleife um 2
+		//decrimiert LÃ¤nge von TCP Headerschleife um 2
 		result16 -=2;
 		}
 
@@ -54,9 +54,9 @@ int checksum (unsigned char * pointer,unsigned long result32,unsigned int result
 	
 return (result16);
 }
-/*	Funktionen, um zu überprüfen, ob das Packet für uns bestimmt ist, weitere Prüf'routinen'
-	sind als Macros in stack.h definiert, da sie unabhängig von der IP immer auf dieselbe Art
-	geprüft werden können
+/*	Funktionen, um zu Ã¼berprÃ¼fen, ob das Packet fÃ¼r uns bestimmt ist, weitere PrÃ¼f'routinen'
+	sind als Macros in stack.h definiert, da sie unabhÃ¤ngig von der IP immer auf dieselbe Art
+	geprÃ¼ft werden kÃ¶nnen
 ######################################################################################*/
 uint8_t Checkmymac(void){
 	if(buffer[0] == mymac[0] && buffer[1] == mymac[1] && buffer[2] == mymac[2] && buffer[3] == mymac[3] && buffer[4] == mymac[4] && buffer[5] == mymac[5])return(1);
@@ -83,8 +83,8 @@ void eth(unsigned char *buff){
 void ip(unsigned char *buff){
 	struct IP_header *ip;
 	unsigned int sum;
-	
-	ip = (struct IP_Header *)&buff[24];
+
+	ip = (struct IP_Header *) &buff[24];
 
 	for(unsigned char a=0;a<4; a++)
 	{		
@@ -98,7 +98,7 @@ void ip(unsigned char *buff){
 	
 	ip->IP_checksum = ((sum & 0xFF00) >> 8)|((sum & 0x00FF)<<8); 
 }
-/*Funktion um auf ein Arp Request eine Antwort zurück zu senden
+/*Funktion um auf ein Arp Request eine Antwort zurÃ¼ck zu senden
 ####################################################################################*/
 void arp(unsigned int len, unsigned char *buff){
 		
@@ -152,21 +152,21 @@ void udp(unsigned int len, unsigned char *buff){
 	
 	// IP header erzeugen
 	buff[16] = ((IP_UDP_HEADERLENGHT+len) & 0xFF00)>>8;
-	buff[17] = ((IP_UDP_HEADERLENGHT+len) & 0x00FF); // ip header lenght anpassen
+	buff[17] = ((IP_UDP_HEADERLENGHT+len) & 0x00FF); // ip header length anpassen
 	
 	ip(buff); 
 		
-	//An den Port zurücksenden, von dem das Packet gekommen ist
+	//An den Port zurÃ¼cksenden, von dem das Packet gekommen ist
 	tempport = udp->UDP_destPort; // Ziel Port zwischenspeichern
 	udp->UDP_destPort = udp->UDP_sourcePort; //ZielPort neuschreiben
 	udp->UDP_sourcePort = tempport; // SourcePort neuschreiben
 
-	//Udp Header&Datenlänge schreiben
-	udp->UDP_lenght_h = ((UDP_HEADERLENGHT+len) & 0xFF00)>>8;
-	udp->UDP_lenght_l = ((UDP_HEADERLENGHT+len) & 0x00FF);
+	//Udp Header&DatenlÃ¤nge schreiben
+	udp->UDP_length_h = ((UDP_HEADERLENGHT+len) & 0xFF00)>>8;
+	udp->UDP_length_l = ((UDP_HEADERLENGHT+len) & 0x00FF);
 	
 	//Checksumme ausrechnen...
-	udp->UDP_checksum = 0x00;
+//	udp->UDP_checksum = 0x00;
 	sum = checksum(&buff[26],TYPE_UDP+UDP_HEADERLENGHT+len,16+len); 
 	udp->UDP_checksum = ((sum & 0xFF00) >> 8)|((sum & 0x00FF)<<8);
 	

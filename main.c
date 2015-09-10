@@ -1,35 +1,34 @@
 /*	##################################
 	-Der buffer ist in stack.h definiert
-	 er ist in der Grösse ziemlich variabel,
+	 er ist in der GrÃ¶sse ziemlich variabel,
 	 wenn man nicht gerade TCP verwendet,
-	 dann sollte auch eine Buffergrösse von
-	 256 Reichen, für nur arp und udp evt
+	 dann sollte auch eine BuffergrÃ¶sse von
+	 256 Reichen, fÃ¼r nur arp und udp evt
 	 sogar 128
 	-Ip & Mac wird in stack.c festgelegt!
-	-der zu verwendende Pin für /CS wird
+	-der zu verwendende Pin fÃ¼r /CS wird
 	 am Anfang von enc28h60.h festgelegt
 	####################################
 */
 #include <avr/io.h>
+#include <string.h>
 #include "stack.h"
 #include "enc28j60.h"
-
+#include "uart.h"
 
 #define TERMINATE 1
 #define DONT_TERMINATE 0
 
-/*einfache memcpy*/ 
 void printinbuffer(uint8_t *buff,uint8_t *text,uint8_t terminate){
 	while(*text){
 		*buff++ = *text++;
 	}
-	if(terminate) *buff++ = 0x00;
+	if(terminate) *buff++ = '\0';
 }
 
 
 /*	einfache strcmp, zwecks Lerneffekt auch selbst gemacht*/
 uint8_t compare(uint8_t *buffone, uint8_t *bufftwo){
-	
 	uint8_t counterone=0,countertwo=0;
 	while(*bufftwo){
 		if(*buffone++ == *bufftwo++){counterone++;}
@@ -42,16 +41,17 @@ uint8_t compare(uint8_t *buffone, uint8_t *bufftwo){
 
 
 int main(void){
-
+    init_uart();
 	
-	unsigned int packet_lenght;
+	unsigned int packet_length;
 	
-	
+    uart_puts("beginning startup procedure\r\n");    
 	/*ENC Initialisieren*/
 	enc28j60Init();
+    uart_puts("initialization finished\r\n");
 	//Mac Adresse setzen(stack.h, dort wird auch die Ip festgelegt)
 	nicSetMacAddress(mymac);
-	
+	uart_puts("mac address set\r\n");
 	/*	Leds konfigurieren
 		LEDA : Link status
 		LEDB : Receive activity
@@ -69,53 +69,41 @@ int main(void){
 
 	
 	while(1){
-	//Buffer des Enc's abhohlen :-)
-	packet_lenght = enc28j60PacketReceive(BUFFER_SIZE, buffer);
+		//Buffer des Enc's abhohlen :-)
+		packet_length = enc28j60PacketReceive(BUFFER_SIZE, buffer);
 		
-		/*Wenn ein Packet angekommen ist, ist packet_lenght =! 0*/
-		if(packet_lenght){
-		
-		
-			/*Ist das Packet ein Broadcast packet, vom Typ Arp und an unsere Ip gerichtet?*/
+		/*Wenn ein Packet angekommen ist, ist packet_length =! 0*/
+		if(packet_length){
+			/*Ist das Packet ein Broadcast Packet, vom Typ Arp und an unsere Ip gerichtet?*/
 			if(Checkbroadcast() && Checkarppackage() && Checkmyip()){
-						arp(packet_lenght, buffer);
+				arp(packet_length, buffer);
 			}
-	
+
 			/*Ist das Packet kein Broadcast, sondern explizit an unsere mac adresse gerichtet?*/
 			if(Checkmymac()){
-				
 				/*Handelt es sich um ein ICMP Packet? ->beantworten (Pong)*/
-				if (buffer[IP_TYPEFIELD] == TYPE_ICMP)icmp(packet_lenght,buffer);
-				
+				if (buffer[IP_TYPEFIELD] == TYPE_ICMP)
+					icmp(packet_length,buffer);
 				
 				/*Handelt es sich um ein UDP Packet, das auf Port 85 reinkommt?*/
 				if(buffer[IP_TYPEFIELD] == TYPE_UDP && buffer[UDP_PORT_L] == 85){	
-					
-					/*	Folgendes dient bloss als Anwendungsbeispiel, 
-						die empfangenen Daten liegen im buffer ab adresse UDP_DATA
-						und können natürlich auch für ganz andere Zweche verwendet
-						werden.
-						TODO: -Funktion um nicht nur auf UDP Packete zu antworten,
-							   sondern auch welche zu erzeugen
-							  -TCP(muss ich erst noch verstehen :-) )
-					*/
-					
 					if(compare(&buffer[UDP_DATA], "test")){
-						
 						printinbuffer(&buffer[UDP_DATA], "Das Test Packetchen ist angekommen :-)",TERMINATE);
-						//Die Länge 38 bezieht sich hier nur auf die Nutzdaten, headerlänge etc wird von der
-						//Udp Funktion natürlich selbst übernommen...
+						//Die LÃ¤nge 38 bezieht sich hier nur auf die Nutzdaten, headerlÃ¤nge etc wird von der
+						//Udp Funktion natÃ¼rlich selbst Ã¼bernommen...
 						udp(38,buffer); 
 					}
-					
+/*					if(compare(&buffer[UDP_DATA], "uart")) {
+						uint16_t udp_len = (uint16_t) &buffer[UDP_LEN];
+						char out[udp_len];
+						strncpy(out, &buffer[UDP_DATA]+5, udp_len-5);
+						uart_puts(out);
+						uart_puts("\r\n");
+					}*/
 				}
-	
 			}
-			
 		}
-	
-	
 	}
 	
-	return (1);
+	return 1;
 }
