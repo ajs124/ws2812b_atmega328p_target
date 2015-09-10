@@ -24,7 +24,7 @@ DEBUG      ?= 0
 # Tune the lines below only if you know what you are doing:
 
 AVRDUDE = avrdude $(PROGRAMMER) -p m328p -v
-COMPILE = avr-gcc -std=c99 -Wall -Os -mmcu=$(DEVICE) -DDEBUG=$(DEBUG) -DF_CPU=8000000UL -I.
+COMPILE = avr-gcc -std=c99 -Wall -Werror -fpack-struct -Os -mmcu=$(DEVICE) -DDEBUG=$(DEBUG) -DF_CPU=8000000UL -I.
 
 # symbolic targets:
 all:	main.hex

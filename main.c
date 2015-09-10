@@ -11,15 +11,18 @@
 	####################################
 */
 #include <avr/io.h>
-#include <string.h>
+#if DEBUG
+	#include <stdlib.h>
+	#include <stdio.h>
+#endif
+#include "uart.h"
 #include "stack.h"
 #include "enc28j60.h"
-#include "uart.h"
 
 #define TERMINATE 1
 #define DONT_TERMINATE 0
 
-void printinbuffer(uint8_t *buff,uint8_t *text,uint8_t terminate){
+void printinbuffer(unsigned char *buff, char *text, uint8_t terminate){
 	while(*text){
 		*buff++ = *text++;
 	}
@@ -28,7 +31,7 @@ void printinbuffer(uint8_t *buff,uint8_t *text,uint8_t terminate){
 
 
 /*	einfache strcmp, zwecks Lerneffekt auch selbst gemacht*/
-uint8_t compare(uint8_t *buffone, uint8_t *bufftwo){
+uint8_t compare(unsigned char *buffone, char *bufftwo){
 	uint8_t counterone=0,countertwo=0;
 	while(*bufftwo){
 		if(*buffone++ == *bufftwo++){counterone++;}
@@ -39,6 +42,54 @@ uint8_t compare(uint8_t *buffone, uint8_t *bufftwo){
 
 }
 
+// based on https://stackoverflow.com/questions/7775991/how-to-get-hexdump-of-a-structure-data
+#if DEBUG
+void hexdump (void *addr, int len) {
+    uint8_t i;
+    char buff[17], c[8];
+    char *pc = (char*)addr;
+
+    // Process every byte in the data.
+    for (i = 0; i < len; i++) {
+        // Multiple of 16 means new line (with line offset).
+
+        if ((i % 16) == 0) {
+            // Just don't print ASCII for the zeroth line.
+            if (i != 0) {
+                uart_puts("  ");
+                uart_puts(buff);
+                uart_puts("\r\n");
+            }
+
+            // Output the offset.
+            sprintf(c, "  %04x  ", i);
+            uart_puts(c);
+        }
+
+        // Now the hex code for the specific character.
+        sprintf(c, " %02x", pc[i]);
+        uart_puts(c);
+
+        // And store a printable ASCII character for later.
+        if ((pc[i] < 0x20) || (pc[i] > 0x7e))
+            buff[i % 16] = '.';
+        else
+            buff[i % 16] = pc[i];
+        buff[(i % 16) + 1] = '\0';
+    }
+
+    // Pad out last line if not exactly 16 characters.
+    while ((i % 16) != 0) {
+        uart_puts("   ");
+        i++;
+    }
+
+    // And print the final ASCII bit.
+    uart_puts("  ");
+    uart_puts(buff);
+    uart_puts("\r\n");
+}
+#endif
 
 int main(void){
     init_uart();
@@ -69,37 +120,48 @@ int main(void){
 
 	
 	while(1){
-		//Buffer des Enc's abhohlen :-)
+		// Buffer des Enc's abhohlen :-)
 		packet_length = enc28j60PacketReceive(BUFFER_SIZE, buffer);
 		
-		/*Wenn ein Packet angekommen ist, ist packet_length =! 0*/
-		if(packet_length){
-			/*Ist das Packet ein Broadcast Packet, vom Typ Arp und an unsere Ip gerichtet?*/
-			if(Checkbroadcast() && Checkarppackage() && Checkmyip()){
+		// Wenn ein Packet angekommen ist, ist packet_length =! 0
+		if(packet_length) {
+//			hexdump(buffer, 64);
+			// Ist das Packet ein Broadcast Packet, vom Typ Arp und an unsere Ip gerichtet?
+			if(checkbroadcast() && checkarppackage() && checkmyip()){
 				arp(packet_length, buffer);
 			}
 
-			/*Ist das Packet kein Broadcast, sondern explizit an unsere mac adresse gerichtet?*/
-			if(Checkmymac()){
-				/*Handelt es sich um ein ICMP Packet? ->beantworten (Pong)*/
-				if (buffer[IP_TYPEFIELD] == TYPE_ICMP)
-					icmp(packet_length,buffer);
-				
-				/*Handelt es sich um ein UDP Packet, das auf Port 85 reinkommt?*/
-				if(buffer[IP_TYPEFIELD] == TYPE_UDP && buffer[UDP_PORT_L] == 85){	
-					if(compare(&buffer[UDP_DATA], "test")){
-						printinbuffer(&buffer[UDP_DATA], "Das Test Packetchen ist angekommen :-)",TERMINATE);
-						//Die Länge 38 bezieht sich hier nur auf die Nutzdaten, headerlänge etc wird von der
-						//Udp Funktion natürlich selbst übernommen...
-						udp(38,buffer); 
+			// Ist das Packet kein Broadcast, sondern explizit an unsere mac adresse gerichtet?
+			if(checkmymac()){
+				struct ETH_frame *frame = (struct ETH_frame *) buffer;
+				if(frame->type_length > 1500 && frame->type_length == 0x0800) {
+					struct IP_segment *ip = (struct IP_segment *) frame->payload;
+					if(ip->protocol == TYPE_ICMP) {
+						icmp(packet_length, buffer);
+						continue;
+					} else if(ip->protocol == TYPE_UDP) {
+						struct UDP_packet *pkt = (struct UDP_packet *) ip->payload;
+						pkt->length = ntohs(pkt->length);
+						pkt->destPort = ntohs(pkt->destPort);
+						pkt->sourcePort = ntohs(pkt->sourcePort);
+						pkt->checksum = ntohs(pkt->checksum);
+
+						if(pkt->destPort == 85 && compare(pkt->data, "test")) {
+							printinbuffer(pkt->data, "Test erfolgreich!", TERMINATE);
+							udp(18, buffer);
+							continue;
+						}
+
+						if(pkt->destPort == 86) {
+							uart_puts((char*) pkt->data);
+							uart_puts("\r\n");
+							continue;
+						}
+
+						if(pkt->destPort == 7) {
+							udp(pkt->length, buffer);
+						}
 					}
-/*					if(compare(&buffer[UDP_DATA], "uart")) {
-						uint16_t udp_len = (uint16_t) &buffer[UDP_LEN];
-						char out[udp_len];
-						strncpy(out, &buffer[UDP_DATA]+5, udp_len-5);
-						uart_puts(out);
-						uart_puts("\r\n");
-					}*/
 				}
 			}
 		}

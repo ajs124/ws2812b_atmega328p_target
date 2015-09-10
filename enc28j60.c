@@ -28,8 +28,8 @@
 #endif
 #include <stdlib.h>
 
-u08 Enc28j60Bank;
-u16 NextPacketPtr;
+uint8_t Enc28j60Bank;
+uint16_t NextPacketPtr;
 #define ENC28J60_CONTROL_PORT	PORTD
 #define ENC28J60_CONTROL_DDR	DDRD
 #define ENC28J60_CONTROL_CS		4
@@ -48,7 +48,7 @@ void delay(unsigned short us)
     for (i=0; i < delay_loops; i++) {};
 } 
 
-void nicSetMacAddress(u08* macaddr)
+void nicSetMacAddress(volatile uint8_t* macaddr)
 {
 	// write MAC address
 	// NOTE: MAC address in ENC28J60 is byte-backward
@@ -61,9 +61,9 @@ void nicSetMacAddress(u08* macaddr)
 }
 
 
-u08 enc28j60ReadOp(u08 op, u08 address)
+uint8_t enc28j60ReadOp(uint8_t op, uint8_t address)
 {
-	u08 data;
+	uint8_t data;
    
 	// assert CS
 	ENC28J60_CONTROL_PORT &= ~(1<<ENC28J60_CONTROL_CS);
@@ -85,7 +85,7 @@ u08 enc28j60ReadOp(u08 op, u08 address)
 	// release CS
 	ENC28J60_CONTROL_PORT |= (1<<ENC28J60_CONTROL_CS);
 
-#if DEBUG
+/*#if DEBUG
     uart_puts("ReadOp: addr=0x");
     char buf[8];
     utoa(address, buf, 16);
@@ -97,11 +97,11 @@ u08 enc28j60ReadOp(u08 op, u08 address)
     utoa(data, buf, 16);
     uart_puts(buf);
     uart_puts("\r\n");
-#endif
+#endif*/
 	return data;
 }
 
-void enc28j60WriteOp(u08 op, u08 address, u08 data)
+void enc28j60WriteOp(uint8_t op, uint8_t address, uint8_t data)
 {
 	// assert CS
 	ENC28J60_CONTROL_PORT &= ~(1<<ENC28J60_CONTROL_CS);
@@ -115,7 +115,7 @@ void enc28j60WriteOp(u08 op, u08 address, u08 data)
 
 	// release CS
 	ENC28J60_CONTROL_PORT |= (1<<ENC28J60_CONTROL_CS);
-#if DEBUG
+/*#if DEBUG
     uart_puts("WriteOp: addr=0x");
     char buf[32];
     utoa(address, buf, 16);
@@ -127,10 +127,10 @@ void enc28j60WriteOp(u08 op, u08 address, u08 data)
     utoa(data, buf, 16);
     uart_puts(buf);
     uart_puts("\r\n");
-#endif
+#endif*/
 }
 
-void enc28j60ReadBuffer(u16 len, u08* data)
+void enc28j60ReadBuffer(uint16_t len, uint8_t* data)
 {
 	// assert CS
 	ENC28J60_CONTROL_PORT &= ~(1<<ENC28J60_CONTROL_CS);
@@ -149,7 +149,7 @@ void enc28j60ReadBuffer(u16 len, u08* data)
 	ENC28J60_CONTROL_PORT |= (1<<ENC28J60_CONTROL_CS);
 }
 
-void enc28j60WriteBuffer(u16 len, u08* data)
+void enc28j60WriteBuffer(uint16_t len, uint8_t* data)
 {
 	// assert CS
 	ENC28J60_CONTROL_PORT &= ~(1<<ENC28J60_CONTROL_CS);
@@ -167,7 +167,7 @@ void enc28j60WriteBuffer(u16 len, u08* data)
 	ENC28J60_CONTROL_PORT |= (1<<ENC28J60_CONTROL_CS);
 }
 
-void enc28j60SetBank(u08 address)
+void enc28j60SetBank(uint8_t address)
 {
 	// set the bank (if needed)
 	if((address & BANK_MASK) != Enc28j60Bank)
@@ -179,7 +179,7 @@ void enc28j60SetBank(u08 address)
 	}
 }
 
-u08 enc28j60Read(u08 address)
+uint8_t enc28j60Read(uint8_t address)
 {
 	// set the bank
 	enc28j60SetBank(address);
@@ -187,7 +187,7 @@ u08 enc28j60Read(u08 address)
 	return enc28j60ReadOp(ENC28J60_READ_CTRL_REG, address);
 }
 
-void enc28j60Write(u08 address, u08 data)
+void enc28j60Write(uint8_t address, uint8_t data)
 {
 	// set the bank
 	enc28j60SetBank(address);
@@ -197,7 +197,7 @@ void enc28j60Write(u08 address, u08 data)
 
 
 
-void enc28j60PhyWrite(u08 address, u16 data)
+void enc28j60PhyWrite(uint8_t address, uint16_t data)
 {
 	// set the PHY register address
 	enc28j60Write(MIREGADR, address);
@@ -216,9 +216,7 @@ void enc28j60Init(void)
 
 	ENC28J60_CONTROL_DDR |= 1<<ENC28J60_CONTROL_CS;
 	ENC28J60_CONTROL_PORT |= 1<<ENC28J60_CONTROL_CS;
-	
 
-	
 	PORTB |= 1<<PB5; //SCK HI
 	DDRB  |= 1<<PB2 |1<<PB3 | 1<<PB5; // mosi, sck, ss output
 	DDRB  &= ~(1<<PB4); // miso input
@@ -227,7 +225,6 @@ void enc28j60Init(void)
 	// master mode und /2x takt (klappt auch wenn der mega8 mit 16mhz läuft !!)
 	SPCR |= 1<<MSTR | 1<<SPE;
 	SPSR |= 1<<SPI2X;
-	
 
 	// perform system reset
 	enc28j60WriteOp(ENC28J60_SOFT_RESET, 0, ENC28J60_SOFT_RESET);
@@ -268,7 +265,7 @@ void enc28j60Init(void)
 	// set inter-frame gap (back-to-back)
 	enc28j60Write(MABBIPG, 0x12);
 	// Set the maximum packet size which the controller will accept
-	enc28j60Write(MAMXFLL, MAX_FRAMELEN&0xFF);	
+	enc28j60Write(MAMXFLL, MAX_FRAMELEN&0xFF);
 	enc28j60Write(MAMXFLH, MAX_FRAMELEN>>8);
 
 	// do bank 3 stuff
@@ -284,10 +281,13 @@ void enc28j60Init(void)
 	// no loopback of transmitted frames
 	enc28j60PhyWrite(PHCON2, PHCON2_HDLDIS);
 
+	// set up some filters. We accept unicasts and broadcasts, but only if their CRC is ok
+	enc28j60Write(ERXFCON, ERXFCON_UCEN | ERXFCON_ANDOR | ERXFCON_BCEN | ERXFCON_CRCEN);
+
 	// switch to bank 0
 	enc28j60SetBank(ECON1);
 	// enable interrutps
-	enc28j60WriteOp(ENC28J60_BIT_FIELD_SET, EIE, EIE_INTIE|EIE_PKTIE);
+//	enc28j60WriteOp(ENC28J60_BIT_FIELD_SET, EIE, EIE_INTIE|EIE_PKTIE);
 	// enable packet reception
 	enc28j60WriteOp(ENC28J60_BIT_FIELD_SET, ECON1, ECON1_RXEN);
 
@@ -314,8 +314,8 @@ void enc28j60PacketSend(unsigned int len, unsigned char* packet)
 
 unsigned int enc28j60PacketReceive(unsigned int maxlen, unsigned char* packet)
 {
-	u16 rxstat;
-	u16 len;
+	uint16_t rxstat;
+	uint16_t len;
 
 	// check if a packet has been received and buffered
 	if( !(enc28j60Read(EIR) & EIR_PKTIF) )

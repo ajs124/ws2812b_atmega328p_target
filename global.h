@@ -23,8 +23,6 @@
 
 // global AVRLIB defines
 #include "avrlibdefs.h"
-// global AVRLIB types definitions
-#include "avrlibtypes.h"
 
 // project/system dependent defines
 

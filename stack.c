@@ -1,10 +1,11 @@
 #include "stack.h"
+#include "uart.h"
 
 /*NIC Einstellungen !! -----------------------------------
 #########################################################*/
 
-volatile unsigned char myip[4] = {192,168,1,96};
-volatile unsigned char mymac[6] = {0xab,0xbc,0x6f,0x55,0x1c,0xc2};
+volatile unsigned char myip[4] = {192,168,2,96};
+volatile unsigned char mymac[6] = {0x02,0x05,0x69,0x55,0x1c,0xc2};
 
 /*#######################################################
 # Funktion um die Checksumme zu berechnen, stammt 		#
@@ -52,51 +53,63 @@ int checksum (unsigned char * pointer,unsigned long result32,unsigned int result
 	result32 = ((result32 & 0x0000FFFF)+ ((result32 & 0xFFFF0000) >> 16));	
 	result16 =~(result32 & 0x0000FFFF);
 	
-return (result16);
+	return (result16);
 }
+
+uint16_t htons(uint16_t hostshort) {
+	return ((hostshort>>8)&0xff) | (hostshort<<8);
+}
+
+uint16_t ntohs(uint16_t hostshort) __attribute__((weak,alias("htons")));
+
 /*	Funktionen, um zu überprüfen, ob das Packet für uns bestimmt ist, weitere Prüf'routinen'
 	sind als Macros in stack.h definiert, da sie unabhängig von der IP immer auf dieselbe Art
 	geprüft werden können
 ######################################################################################*/
-uint8_t Checkmymac(void){
-	if(buffer[0] == mymac[0] && buffer[1] == mymac[1] && buffer[2] == mymac[2] && buffer[3] == mymac[3] && buffer[4] == mymac[4] && buffer[5] == mymac[5])return(1);
-	return(0);
-}
-
-uint8_t Checkmyip(void){
-	if(buffer[38] == myip[0] && buffer[39] == myip[1] && buffer[40] == myip[2] && buffer[41] == myip[3])return(1);
-	return(0);
-}
-
-/*Funktion um den Ethernet II Header zu erzeugen
-####################################################################################*/
-void eth(unsigned char *buff){
-	
-	for(unsigned char a=0; a<6; a++)
-		{		
-			buff[a] = buff[a+6];
-			buff[a+6] = mymac[a];
+uint8_t checkmymac(void) {
+	for(uint8_t i=0; i < 6; ++i) {
+		if(buffer[i] != mymac[i]) {
+			return 0;
 		}
+	}
+	return 1;
 }
-/*Funktion um den IP Header zu erzeugen
-####################################################################################*/
+
+uint8_t checkmyip(void) {
+	for(uint8_t i=0; i < 4; ++i) {
+		if(buffer[38+i] != myip[i]) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+// Funktion um den Ethernet II Header zu erzeugen
+void eth(unsigned char *buff){
+	for(uint8_t a=0; a<6; a++) {
+		buff[a] = buff[a+6];
+		buff[a+6] = mymac[a];
+	}
+}
+
+// Funktion um den IP Header zu erzeugen
 void ip(unsigned char *buff){
-	struct IP_header *ip;
+	struct IP_segment *ip;
 	unsigned int sum;
 
-	ip = (struct IP_Header *) &buff[24];
+	ip = (struct IP_segment *) &buff[24];
 
-	for(unsigned char a=0;a<4; a++)
+	for(uint8_t a=0;a<4; a++)
 	{		
-		ip->IP_destIp[a] = ip->IP_sourceIp[a];
-		ip->IP_sourceIp[a] = myip[a];
+		ip->destIp[a] = ip->sourceIp[a];
+		ip->sourceIp[a] = myip[a];
 	}
 
 
-	ip->IP_checksum = 0x00; // checksum auf null setzen
+	ip->checksum = 0x00; // checksum auf null setzen
 	sum = checksum(&buff[14],0x00000000,20); // checksumme ausrechnen
 	
-	ip->IP_checksum = ((sum & 0xFF00) >> 8)|((sum & 0x00FF)<<8); 
+	ip->checksum = htons(sum); 
 }
 /*Funktion um auf ein Arp Request eine Antwort zurück zu senden
 ####################################################################################*/
@@ -104,7 +117,7 @@ void arp(unsigned int len, unsigned char *buff){
 		
 	eth(buff); // ETHERNET II header erzeugen
 	struct ARP_header *arp;
-	arp = (struct ARP_Header *)&buff[21];
+	arp = (struct ARP_header *)&buff[21];
 	arp->Opcode = 0x02; //Reply einstellen
 	for(unsigned char a=0; a<6; a++)
 		{			
@@ -127,7 +140,7 @@ void icmp(unsigned int len, unsigned char *buff){
 	ip(buff); // IP header erzeugen
 	
 	struct ICMP_header *icmp;
-	icmp = (struct ICMP_Header *)&buff[34];
+	icmp = (struct ICMP_header *)&buff[34];
 	
 	icmp->ICMP_type = 0x00; // auf reply einstellen
 	icmp->ICMP_code = 0x00; 
@@ -144,34 +157,37 @@ void icmp(unsigned int len, unsigned char *buff){
 ####################################################################################*/
 void udp(unsigned int len, unsigned char *buff){ 
 	uint16_t tempport,sum;
-	struct UDP_header *udp;
-	udp = (struct UDP_Header *)&buff[34];
+	unsigned char *temp = buff;
+	temp += ETH_HEADERLENGTH;
+	temp += IP_HEADERLENGTH;
+	struct UDP_packet *udp = (struct UDP_packet *) temp;
 	
 	// ETHERNET II header erzeugen
-	eth(buff); 
+	eth(buff);
 	
-	// IP header erzeugen
-	buff[16] = ((IP_UDP_HEADERLENGHT+len) & 0xFF00)>>8;
-	buff[17] = ((IP_UDP_HEADERLENGHT+len) & 0x00FF); // ip header length anpassen
+	// IP header erzeugen. ohne htons() weil unsigned char array
+	buff[16] = ((IP_UDP_HEADERLENGTH+len) & 0xFF00)>>8;
+	buff[17] = ((IP_UDP_HEADERLENGTH+len) & 0x00FF); // ip header length anpassen
 	
-	ip(buff); 
-		
+	ip(buff);
+
 	//An den Port zurücksenden, von dem das Packet gekommen ist
-	tempport = udp->UDP_destPort; // Ziel Port zwischenspeichern
-	udp->UDP_destPort = udp->UDP_sourcePort; //ZielPort neuschreiben
-	udp->UDP_sourcePort = tempport; // SourcePort neuschreiben
+	tempport = udp->destPort; // Ziel Port zwischenspeichern
+	udp->destPort = udp->sourcePort; //ZielPort neuschreiben
+	udp->sourcePort = tempport; // SourcePort neuschreiben
 
 	//Udp Header&Datenlänge schreiben
-	udp->UDP_length_h = ((UDP_HEADERLENGHT+len) & 0xFF00)>>8;
-	udp->UDP_length_l = ((UDP_HEADERLENGHT+len) & 0x00FF);
-	
+	udp->length = htons(UDP_HEADERLENGTH+len);
+	udp->destPort = htons(udp->destPort);
+	udp->sourcePort = htons(udp->sourcePort);
+
 	//Checksumme ausrechnen...
-//	udp->UDP_checksum = 0x00;
-	sum = checksum(&buff[26],TYPE_UDP+UDP_HEADERLENGHT+len,16+len); 
-	udp->UDP_checksum = ((sum & 0xFF00) >> 8)|((sum & 0x00FF)<<8);
+	udp->checksum = 0x00; // ???
+	sum = checksum(&buff[26],TYPE_UDP+UDP_HEADERLENGTH+len,16+len);
+	udp->checksum = htons(sum);
 	
 	//Und ab damit :-)
-	enc28j60PacketSend(IP_UDP_HEADERLENGHT + ETH_HEADERLENGHT +len,buff);	
+	enc28j60PacketSend(IP_UDP_HEADERLENGTH + ETH_HEADERLENGTH + len, buff);
 }
 
 

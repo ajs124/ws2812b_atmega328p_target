@@ -39,23 +39,6 @@
 #ifndef sbi
 	#define sbi(reg,bit)	reg |= (BV(bit))
 #endif
-#ifndef cli
-	#define cli()			__asm__ __volatile__ ("cli" ::)
-#endif
-#ifndef sei
-	#define sei()			__asm__ __volatile__ ("sei" ::)
-#endif
-
-// support for individual port pin naming in the mega128
-// see port128.h for details
-#ifdef __AVR_ATmega128__
-// not currently necessary due to inclusion
-// of these defines in newest AVR-GCC
-// do a quick test to see if include is needed
-#ifndef PD0
-	#include "port128.h"
-#endif
-#endif
 
 // use this for packed structures
 // (this is seldom necessary on an 8-bit architecture like AVR,
