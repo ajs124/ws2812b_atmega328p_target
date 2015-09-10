@@ -9,16 +9,15 @@ void init_uart() {
     UCSR0C |= (1<<UCSZ01)|(1<<UCSZ00)|(0<<USBS0);
 }
 
-uint8_t uart_putc(unsigned char c) {
+void uart_putc(unsigned char c) {
     while (!(UCSR0A & (1<<UDRE0)));  /* warten bis Senden moeglich */
-    UDR0 = c;                      /* sende Zeichen */
-    return 0;
+    UDR0 = c;                        /* sende Zeichen */
 }
  
 void uart_puts (char *s) {
-    while (*s) {   /* so lange *s != '\0' also ungleich dem "String-Endezeichen(Terminator)" */
+    while (*s) {
         uart_putc(*s);
-        s++;
+        ++s;
     }
 }
 #endif

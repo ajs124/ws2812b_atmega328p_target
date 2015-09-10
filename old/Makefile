@@ -13,7 +13,7 @@
 
 DEVICE     = atmega328p
 PROGRAMMER = -c usbasp
-OBJECTS    = spi.o uart.o main.o
+OBJECTS    = uart.o spi.o ethernet.o main.o
 # 8 MHz
 #FUSES      = -U lfuse:w:0xe2:m -U hfuse:w:0xd9:m  
 DEBUG      ?= 0
