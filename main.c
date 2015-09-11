@@ -13,83 +13,11 @@
 #include <avr/io.h>
 #if DEBUG
 	#include <stdlib.h>
-	#include <stdio.h>
 #endif
 #include "uart.h"
 #include "stack.h"
 #include "enc28j60.h"
-
-#define TERMINATE 1
-#define DONT_TERMINATE 0
-
-void printinbuffer(unsigned char *buff, char *text, uint8_t terminate){
-	while(*text){
-		*buff++ = *text++;
-	}
-	if(terminate) *buff++ = '\0';
-}
-
-
-/*	einfache strcmp, zwecks Lerneffekt auch selbst gemacht*/
-uint8_t compare(unsigned char *buffone, char *bufftwo){
-	uint8_t counterone=0,countertwo=0;
-	while(*bufftwo){
-		if(*buffone++ == *bufftwo++){counterone++;}
-		countertwo++;
-	}
-	if(counterone==countertwo) return(1);
-	return(0);
-
-}
-
-// based on https://stackoverflow.com/questions/7775991/how-to-get-hexdump-of-a-structure-data
-#if DEBUG
-void hexdump (void *addr, int len) {
-    uint8_t i;
-    char buff[17], c[8];
-    char *pc = (char*)addr;
-
-    // Process every byte in the data.
-    for (i = 0; i < len; i++) {
-        // Multiple of 16 means new line (with line offset).
-
-        if ((i % 16) == 0) {
-            // Just don't print ASCII for the zeroth line.
-            if (i != 0) {
-                uart_puts("  ");
-                uart_puts(buff);
-                uart_puts("\r\n");
-            }
-
-            // Output the offset.
-            sprintf(c, "  %04x  ", i);
-            uart_puts(c);
-        }
-
-        // Now the hex code for the specific character.
-        sprintf(c, " %02x", pc[i]);
-        uart_puts(c);
-
-        // And store a printable ASCII character for later.
-        if ((pc[i] < 0x20) || (pc[i] > 0x7e))
-            buff[i % 16] = '.';
-        else
-            buff[i % 16] = pc[i];
-        buff[(i % 16) + 1] = '\0';
-    }
-
-    // Pad out last line if not exactly 16 characters.
-    while ((i % 16) != 0) {
-        uart_puts("   ");
-        i++;
-    }
-
-    // And print the final ASCII bit.
-    uart_puts("  ");
-    uart_puts(buff);
-    uart_puts("\r\n");
-}
-#endif
+#include "util.h"
 
 int main(void){
     init_uart();
@@ -119,32 +47,46 @@ int main(void){
 	//enc28j60PhyWrite(0x14,0b0000010000100000);
 
 	
-	while(1){
+	while(1) {
 		// Buffer des Enc's abhohlen :-)
 		packet_length = enc28j60PacketReceive(BUFFER_SIZE, buffer);
 		
 		// Wenn ein Packet angekommen ist, ist packet_length =! 0
 		if(packet_length) {
-//			hexdump(buffer, 64);
-			// Ist das Packet ein Broadcast Packet, vom Typ Arp und an unsere Ip gerichtet?
-			if(checkbroadcast() && checkarppackage() && checkmyip()){
-				arp(packet_length, buffer);
-			}
+			struct ETH_frame *frame = (struct ETH_frame *) buffer;
+			frame->type_length = ntohs(frame->type_length);
+//			if(compare_macs(frame->destMac, (uint8_t *) BROADCAST_MAC)) {
+				if(frame->type_length == TYPE_ARP) {
+					struct ARP_packet *arp_pkt = (struct ARP_packet *) frame->payload;
+					if(compare_ips(arp_pkt->destIp, (uint8_t *) myip)) {
+						arp(packet_length, buffer);
+					}
+				}
+				continue;
+//			}
 
-			// Ist das Packet kein Broadcast, sondern explizit an unsere mac adresse gerichtet?
-			if(checkmymac()){
-				struct ETH_frame *frame = (struct ETH_frame *) buffer;
-				if(frame->type_length > 1500 && frame->type_length == 0x0800) {
+			if(compare_macs(frame->destMac, (uint8_t *) mymac)) {
+				uart_puts("unicast recieved. macs match\r\n");
+				if(frame->type_length == TYPE_IP) {
 					struct IP_segment *ip = (struct IP_segment *) frame->payload;
+					#if DEBUG
+					hexdump(ip, 64);
+					#endif
 					if(ip->protocol == TYPE_ICMP) {
 						icmp(packet_length, buffer);
 						continue;
 					} else if(ip->protocol == TYPE_UDP) {
 						struct UDP_packet *pkt = (struct UDP_packet *) ip->payload;
+						#if DEBUG
+						hexdump(pkt, 64);
+						#endif
 						pkt->length = ntohs(pkt->length);
 						pkt->destPort = ntohs(pkt->destPort);
 						pkt->sourcePort = ntohs(pkt->sourcePort);
 						pkt->checksum = ntohs(pkt->checksum);
+						#if DEBUG
+						hexdump(pkt, 64);
+						#endif
 
 						if(pkt->destPort == 85 && compare(pkt->data, "test")) {
 							printinbuffer(pkt->data, "Test erfolgreich!", TERMINATE);

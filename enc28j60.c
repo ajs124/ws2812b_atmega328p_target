@@ -25,6 +25,7 @@
 #include <avr/io.h>
 #if DEBUG
     #include "uart.h"
+	#include "util.h"
 #endif
 #include <stdlib.h>
 
@@ -48,7 +49,7 @@ void delay(unsigned short us)
     for (i=0; i < delay_loops; i++) {};
 } 
 
-void nicSetMacAddress(volatile uint8_t* macaddr)
+void nicSetMacAddress(const uint8_t* macaddr)
 {
 	// write MAC address
 	// NOTE: MAC address in ENC28J60 is byte-backward
@@ -162,7 +163,7 @@ void enc28j60WriteBuffer(uint16_t len, uint8_t* data)
 		// write data
 		SPDR = *data++;
 		while(!(SPSR & (1<<SPIF)));
-	}	
+	}
 	// release CS
 	ENC28J60_CONTROL_PORT |= (1<<ENC28J60_CONTROL_CS);
 }
@@ -295,6 +296,9 @@ void enc28j60Init(void)
 
 void enc28j60PacketSend(unsigned int len, unsigned char* packet)
 {
+#if DEBUG
+	hexdump(packet, len);
+#endif
 	// Set the write pointer to start of transmit buffer area
 	enc28j60Write(EWRPTL, TXSTART_INIT);
 	enc28j60Write(EWRPTH, TXSTART_INIT>>8);

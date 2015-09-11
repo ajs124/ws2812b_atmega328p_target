@@ -288,7 +288,7 @@
 
 // setup ports for I/O
 
-void nicSetMacAddress(volatile uint8_t* macaddr);
+void nicSetMacAddress(const uint8_t* macaddr);
 
 //! do a ENC28J60 read operation
 uint8_t enc28j60ReadOp(uint8_t op, uint8_t address);
