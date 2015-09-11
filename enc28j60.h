@@ -226,14 +226,14 @@
 #define PHCON2_JABBER	0x0400
 #define PHCON2_HDLDIS	0x0100
 // ENC28J60 ERXFCON Register Bit Definitions
-#define ERXFCON_UCEN    7
-#define ERXFCON_ANDOR   6
-#define ERXFCON_CRCEN   5
-#define ERXFCON_PMEN    4
-#define ERXFCON_MPEN    3
-#define ERXFCON_HTEN    2
-#define ERXFCON_MCEN    1
-#define ERXFCON_BCEN    0
+#define ERXFCON_UCEN    128
+#define ERXFCON_ANDOR   64
+#define ERXFCON_CRCEN   32
+#define ERXFCON_PMEN    16
+#define ERXFCON_MPEN    8
+#define ERXFCON_HTEN    4
+#define ERXFCON_MCEN    2
+#define ERXFCON_BCEN    1
 
 // ENC28J60 Packet Control Byte Bit Definitions
 #define PKTCTRL_PHUGEEN		0x08

@@ -282,8 +282,8 @@ void enc28j60Init(void)
 	// no loopback of transmitted frames
 	enc28j60PhyWrite(PHCON2, PHCON2_HDLDIS);
 
-	// set up some filters. We accept unicasts and broadcasts, but only if their CRC is ok
-	enc28j60Write(ERXFCON, ERXFCON_UCEN | ERXFCON_ANDOR | ERXFCON_BCEN | ERXFCON_CRCEN);
+	// set up some filters. We accept unicasts and broadcasts, but only if their CRC is ok (see page 47/chapter 8 of the manual)
+	enc28j60Write(ERXFCON, ERXFCON_UCEN | ERXFCON_BCEN | ERXFCON_CRCEN);
 
 	// switch to bank 0
 	enc28j60SetBank(ECON1);
@@ -296,9 +296,6 @@ void enc28j60Init(void)
 
 void enc28j60PacketSend(unsigned int len, unsigned char* packet)
 {
-#if DEBUG
-	hexdump(packet, len);
-#endif
 	// Set the write pointer to start of transmit buffer area
 	enc28j60Write(EWRPTL, TXSTART_INIT);
 	enc28j60Write(EWRPTH, TXSTART_INIT>>8);

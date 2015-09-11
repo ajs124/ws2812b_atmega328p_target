@@ -55,18 +55,19 @@ int main(void){
 		if(packet_length) {
 			struct ETH_frame *frame = (struct ETH_frame *) buffer;
 			frame->type_length = ntohs(frame->type_length);
-//			if(compare_macs(frame->destMac, (uint8_t *) BROADCAST_MAC)) {
+			// arping uses unicast after the first by default
+			if(compare_macs(frame->destMac, (uint8_t *) BROADCAST_MAC) || compare_macs(frame->destMac, (uint8_t *) mymac)) {
 				if(frame->type_length == TYPE_ARP) {
 					struct ARP_packet *arp_pkt = (struct ARP_packet *) frame->payload;
 					if(compare_ips(arp_pkt->destIp, (uint8_t *) myip)) {
 						arp(packet_length, buffer);
 					}
+					continue;
 				}
-				continue;
-//			}
+			}
 
 			if(compare_macs(frame->destMac, (uint8_t *) mymac)) {
-				uart_puts("unicast recieved. macs match\r\n");
+				uart_puts("unicast received. macs match\r\n");
 				if(frame->type_length == TYPE_IP) {
 					struct IP_segment *ip = (struct IP_segment *) frame->payload;
 					#if DEBUG
