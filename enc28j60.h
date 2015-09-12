@@ -27,7 +27,6 @@
 #ifndef ENC28J60_H
 #define ENC28J60_H
 
-#include "global.h"
 #include <inttypes.h>
 
 // ENC28J60 Control Registers
@@ -278,6 +277,19 @@
 #define ENC28J60_MAC4 0x1c
 #define ENC28J60_MAC5 0xc2
 #endif
+
+#ifndef inb
+    #define inb(addr)                       (addr)
+#endif
+
+// MIN/MAX/ABS macros
+#define MIN(a,b)                       ((a<b)?(a):(b))
+#define MAX(a,b)                       ((a>b)?(a):(b))
+#define ABS(x)                         ((x>0)?(x):(-x))
+
+// constants
+#define PI             3.14159265359
+
 
 // functions
 // setup ports for I/O
