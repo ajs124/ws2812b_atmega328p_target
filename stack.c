@@ -1,8 +1,9 @@
 #include "stack.h"
 #include "uart.h"
+#include "util.h"
 
 const uint8_t mymac[6] = {0x02,0x05,0x69,0x55,0x1c,0xc2};
-const uint8_t myip[4] = {192,168,2,96};
+const uint8_t myip[4] = {192,168,1,96};
 const uint8_t BROADCAST_MAC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 /*#######################################################
@@ -12,13 +13,13 @@ const uint8_t BROADCAST_MAC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 # wer genaueres zur Checksummenbildung wissen möchte:	#
 # http://www.netfor2.com/udpsum.htm 	 				#
 ########################################################*/
-int checksum (char * pointer, uint32_t result32, uint8_t result16) {
-	uint8_t result16_1 = 0x0000;
-	unsigned char DataH;
-	unsigned char DataL;
+uint16_t checksum(uint16_t len, char *pointer) {
+	uint16_t result16_1 = 0;
+	uint32_t result32 = 0;
+	uint8_t DataH, DataL;
 	
 	//Jetzt werden alle Packete in einer While Schleife addiert
-	while(result16 > 1) {
+	while(len > 1) {
 		//schreibt Inhalt Pointer nach DATAH danach inc Pointer
 		DataH=*pointer++;
 
@@ -30,25 +31,25 @@ int checksum (char * pointer, uint32_t result32, uint8_t result16) {
 		//Addiert packet mit vorherigen
 		result32 = result32 + result16_1;
 		//decrimiert Länge von TCP Headerschleife um 2
-		result16 -=2;
+		len -= 2;
 	}
 
 	//Ist der Wert result16 ungerade ist DataL = 0
-	if(result16 > 0) {
+	if(len > 0) {
 		//schreibt Inhalt Pointer nach DATAH danach inc Pointer
-		DataH=*pointer;
+		DataH = *pointer;
 		//erzeugt Int aus Data L ist 0 (ist nicht in der Berechnung) und Data H
 		result16_1 = (DataH << 8);
 		//Addiert packet mit vorherigen
 		result32 = result32 + result16_1;
-	}
+ 	}
 	
 	//Komplementbildung (addiert Long INT_H Byte mit Long INT L Byte)
 	result32 = ((result32 & 0x0000FFFF)+ ((result32 & 0xFFFF0000) >> 16));
 	result32 = ((result32 & 0x0000FFFF)+ ((result32 & 0xFFFF0000) >> 16));	
-	result16 =~(result32 & 0x0000FFFF);
+	len =~(result32 & 0x0000FFFF);
 	
-	return result16;
+	return ntohs(len);
 }
 
 uint16_t htons(uint16_t hostshort) {
@@ -86,25 +87,24 @@ struct ETH_frame *eth(unsigned char *buff){
 }
 
 // Funktion um den IP Header zu erzeugen
-struct IP_segment *ip(struct ETH_frame *frame){
-	struct IP_segment *ip;
-
-	frame->type_length = htons(TYPE_IP);
-	ip = (struct IP_segment *) frame->payload;
+struct IP_segment *ip(uint16_t length, struct ETH_frame *frame){
+	struct IP_segment *ip_pkt  = (struct IP_segment *) frame->payload;
+	frame->type_length = htons(TYPE_IP4);
 
 	for(uint8_t a=0; a<4; a++) {
-		ip->destIp[a] = ip->sourceIp[a];
-		ip->sourceIp[a] = myip[a];
+		ip_pkt->destIp[a] = ip_pkt->sourceIp[a];
+		ip_pkt->sourceIp[a] = myip[a];
 	}
 
-	ip->checksum = 0x00; // checksum auf null setzen
-	ip->checksum = htons(checksum((char *) ip, 0, IP_HEADERLENGTH)); 
+	ip_pkt->length = htons(length);
 
-	return ip;
+	ip_pkt->checksum = 0;
+	ip_pkt->checksum = checksum(IP_HEADERLENGTH, (char *) ip_pkt);
+
+	return ip_pkt;
 }
 
-/*Funktion um auf ein Arp Request eine Antwort zurück zu senden
-####################################################################################*/
+// Funktion um auf ein Arp Request eine Antwort zurück zu senden
 void arp(uint8_t len, unsigned char *buff){
 	struct ETH_frame *frame = eth(buff); // ETHERNET II header erzeugen
 	struct ARP_packet *arp;
@@ -121,49 +121,45 @@ void arp(uint8_t len, unsigned char *buff){
 			arp->sourceIp[a] = myip[a];
 	}
 	
-	enc28j60PacketSend(ETH_HEADERLENGTH+ARP_LEN, buff);	
+	enc28j60PacketSend(len, buff);
 }
-/*Funktion um ICMP packete zu beantworten
-####################################################################################*/
+
+// Funktion um ICMP packete zu beantworten
 void icmp(uint8_t len, unsigned char *buff){
 	struct ETH_frame *frame = eth(buff); // ETHERNET II header erzeugen
-	struct IP_segment *ip_pkt = ip(frame); // IP header erzeugen
+	struct IP_segment *ip_pkt = ip(len-ETH_HEADERLENGTH, frame); // IP header erzeugen
 	
 	struct ICMP_header *icmp = (struct ICMP_header *) ip_pkt->payload;
 	
 	icmp->type = 0x00; // auf reply einstellen
 	icmp->code = 0x00; 
 	
-	icmp->checksum = htons(checksum((char *) icmp, 0, ICMP_HEADERLENGTH));
+	icmp->checksum = 0;
+	icmp->checksum = checksum(len-IP_HEADERLENGTH-ETH_HEADERLENGTH, (char *) icmp);
 
-	enc28j60PacketSend(len-4, buff);
+	enc28j60PacketSend(len, buff);
 }
 
 /*UDP Funktion, beliebige Antwort
 ####################################################################################*/
-void udp(uint8_t len, unsigned char *buff){ 
+void udp(uint16_t len, unsigned char *buff){ 
 	// ETHERNET II header erzeugen
 	struct ETH_frame *frame = eth(buff);
-	struct IP_segment *ip_pkt = ip(frame);
-	ip_pkt->length = htons(IP_UDP_HEADERLENGTH+len);
+	struct IP_segment *ip_pkt = ip(len+IP_HEADERLENGTH, frame);
 	struct UDP_packet *udp = (struct UDP_packet *) ip_pkt->payload;
-	// checksum falsch?
 
 	//An den Port zurücksenden, von dem das Packet gekommen ist
-	uint16_t tempport = udp->destPort; // Ziel Port zwischenspeichern
-	udp->destPort = udp->sourcePort; //ZielPort neuschreiben
-	udp->sourcePort = tempport; // SourcePort neuschreiben
+	uint16_t tempport = udp->destPort;
+	udp->destPort = udp->sourcePort;
+	udp->sourcePort = tempport;
 
-	//Udp Header&Datenlänge schreiben
-	udp->length = htons(UDP_HEADERLENGTH+len);
-	udp->destPort = htons(udp->destPort);
-	udp->sourcePort = htons(udp->sourcePort);
+	// write ports and length
+	udp->length = htons(len);
 
-	//Checksumme ausrechnen...
-	udp->checksum = 0x00;
-	udp->checksum = htons(checksum((char *) udp, TYPE_UDP+UDP_HEADERLENGTH+len, 16+len));
+	// checksum is optional
+	udp->checksum = 0;
 	
-	enc28j60PacketSend(IP_UDP_HEADERLENGTH + ETH_HEADERLENGTH + len, buff);
+	enc28j60PacketSend(len+ETH_HEADERLENGTH+IP_HEADERLENGTH, buff);
 }
 
 

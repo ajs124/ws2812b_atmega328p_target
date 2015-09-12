@@ -18,36 +18,18 @@
 //*****************************************************************************
 
 #include "global.h"
-//#include "timer.h"
-//#include "rprintf.h"
-
 #include "enc28j60.h"
 #include <avr/io.h>
 #if DEBUG
     #include "uart.h"
 	#include "util.h"
 #endif
-#include <stdlib.h>
 
 uint8_t Enc28j60Bank;
 uint16_t NextPacketPtr;
 #define ENC28J60_CONTROL_PORT	PORTD
 #define ENC28J60_CONTROL_DDR	DDRD
 #define ENC28J60_CONTROL_CS		4
-
-//#define F_CPU        	8000000               		/* Processor Speed */
-#define CYCLES_PER_US 	((F_CPU+500000)/1000000) 	/* cpu cycles per microsecond */
-
-void delay(unsigned short us) 
-{
-    unsigned short  delay_loops;
-    register unsigned short  i;
-
-    delay_loops = (us+3)/5*CYCLES_PER_US; // +3 for rounding up (dirty) 
-
-	// one loop takes 5 cpu cycles 
-    for (i=0; i < delay_loops; i++) {};
-} 
 
 void nicSetMacAddress(const uint8_t* macaddr)
 {
@@ -230,7 +212,6 @@ void enc28j60Init(void)
 	// perform system reset
 	enc28j60WriteOp(ENC28J60_SOFT_RESET, 0, ENC28J60_SOFT_RESET);
 	// check CLKRDY bit to see if reset is complete
-	delay(50);
 	while(!(enc28j60Read(ESTAT) & ESTAT_CLKRDY));
 
 	// do bank 0 stuff
@@ -294,8 +275,7 @@ void enc28j60Init(void)
 
 }
 
-void enc28j60PacketSend(unsigned int len, unsigned char* packet)
-{
+void enc28j60PacketSend(uint16_t len, unsigned char* packet) {
 	// Set the write pointer to start of transmit buffer area
 	enc28j60Write(EWRPTL, TXSTART_INIT);
 	enc28j60Write(EWRPTH, TXSTART_INIT>>8);
@@ -313,8 +293,7 @@ void enc28j60PacketSend(unsigned int len, unsigned char* packet)
 	enc28j60WriteOp(ENC28J60_BIT_FIELD_SET, ECON1, ECON1_TXRTS);
 }
 
-unsigned int enc28j60PacketReceive(unsigned int maxlen, unsigned char* packet)
-{
+uint16_t enc28j60PacketReceive(uint16_t maxlen, unsigned char* packet) {
 	uint16_t rxstat;
 	uint16_t len;
 

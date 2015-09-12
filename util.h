@@ -6,8 +6,6 @@
 
 extern void printinbuffer(unsigned char *buff, char *text, uint8_t terminate);
 extern uint8_t compare(unsigned char *buffone, char *bufftwo);
-#if DEBUG
-    extern void hexdump (void *addr, int len);
-#endif
+extern void hexdump (void *addr, int len);
 
 #endif

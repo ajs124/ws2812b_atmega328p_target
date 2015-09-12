@@ -11,23 +11,20 @@
 	####################################
 */
 #include <avr/io.h>
-#if DEBUG
-	#include <stdlib.h>
-#endif
 #include "uart.h"
 #include "stack.h"
 #include "enc28j60.h"
 #include "util.h"
 
 int main(void){
-    init_uart();
+	init_uart();
 	
-	unsigned int packet_length;
+	uint16_t packet_length;
 	
-    uart_puts("beginning startup procedure\r\n");    
+	uart_puts("beginning startup procedure\r\n");    
 	/*ENC Initialisieren*/
 	enc28j60Init();
-    uart_puts("initialization finished\r\n");
+	uart_puts("initialization finished\r\n");
 	//Mac Adresse setzen(stack.h, dort wird auch die Ip festgelegt)
 	nicSetMacAddress(mymac);
 	uart_puts("mac address set\r\n");
@@ -53,56 +50,45 @@ int main(void){
 		
 		// Wenn ein Packet angekommen ist, ist packet_length =! 0
 		if(packet_length) {
+			packet_length -= 4;
 			struct ETH_frame *frame = (struct ETH_frame *) buffer;
 			frame->type_length = ntohs(frame->type_length);
 			// arping uses unicast after the first by default
-			if(compare_macs(frame->destMac, (uint8_t *) BROADCAST_MAC) || compare_macs(frame->destMac, (uint8_t *) mymac)) {
-				if(frame->type_length == TYPE_ARP) {
-					struct ARP_packet *arp_pkt = (struct ARP_packet *) frame->payload;
-					if(compare_ips(arp_pkt->destIp, (uint8_t *) myip)) {
-						arp(packet_length, buffer);
-					}
-					continue;
+			if((compare_macs(frame->destMac, (uint8_t *) BROADCAST_MAC) || compare_macs(frame->destMac, (uint8_t *) mymac)) && frame->type_length == TYPE_ARP) {
+				struct ARP_packet *arp_pkt = (struct ARP_packet *) frame->payload;
+				if(compare_ips(arp_pkt->destIp, (uint8_t *) myip)) {
+					arp(packet_length, buffer);
 				}
+				continue;
 			}
 
 			if(compare_macs(frame->destMac, (uint8_t *) mymac)) {
-				uart_puts("unicast received. macs match\r\n");
-				if(frame->type_length == TYPE_IP) {
+				if(frame->type_length == TYPE_IP4) {
 					struct IP_segment *ip = (struct IP_segment *) frame->payload;
-					#if DEBUG
-					hexdump(ip, 64);
-					#endif
 					if(ip->protocol == TYPE_ICMP) {
 						icmp(packet_length, buffer);
 						continue;
 					} else if(ip->protocol == TYPE_UDP) {
 						struct UDP_packet *pkt = (struct UDP_packet *) ip->payload;
-						#if DEBUG
-						hexdump(pkt, 64);
-						#endif
-						pkt->length = ntohs(pkt->length);
-						pkt->destPort = ntohs(pkt->destPort);
-						pkt->sourcePort = ntohs(pkt->sourcePort);
-						pkt->checksum = ntohs(pkt->checksum);
-						#if DEBUG
-						hexdump(pkt, 64);
-						#endif
+						pkt->length = pkt->length;
+						pkt->destPort = pkt->destPort;
+						pkt->sourcePort = pkt->sourcePort;
 
-						if(pkt->destPort == 85 && compare(pkt->data, "test")) {
+						if(pkt->destPort == ntohs(7)) {
+							udp(htons(pkt->length), buffer);
+							continue;
+						}
+
+						if(pkt->destPort == ntohs(85) && compare(pkt->data, "test")) {
 							printinbuffer(pkt->data, "Test erfolgreich!", TERMINATE);
 							udp(18, buffer);
 							continue;
 						}
 
-						if(pkt->destPort == 86) {
+						if(pkt->destPort == ntohs(86)) {
 							uart_puts((char*) pkt->data);
 							uart_puts("\r\n");
 							continue;
-						}
-
-						if(pkt->destPort == 7) {
-							udp(pkt->length, buffer);
 						}
 					}
 				}

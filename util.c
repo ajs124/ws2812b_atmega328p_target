@@ -1,22 +1,23 @@
-#include <stdio.h>
-#include <uart.h>
+#if DEBUG
+    #include <stdio.h>
+    #include <uart.h>
+#endif
+#include <inttypes.h>
 
 void printinbuffer(unsigned char *buff, char *text, uint8_t terminate){
-    while(*text){
+    while(*text) {
         *buff++ = *text++;
     }
-    if(terminate) *buff++ = '\0';
+    if(terminate)
+        *buff++ = '\0';
 }
 
-/*  einfache strcmp, zwecks Lerneffekt auch selbst gemacht*/
 uint8_t compare(unsigned char *buffone, char *bufftwo){
-    uint8_t counterone=0,countertwo=0;
-    while(*bufftwo){
-        if(*buffone++ == *bufftwo++){counterone++;}
-        countertwo++;
+    while(*bufftwo && *buffone){
+        if(*buffone++ != *bufftwo++)
+            return 0;
     }
-    if(counterone==countertwo) return(1);
-    return(0);
+    return 1;
 
 }
 

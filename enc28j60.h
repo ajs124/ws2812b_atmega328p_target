@@ -29,7 +29,6 @@
 
 #include "global.h"
 #include <inttypes.h>
-#define nop()	asm volatile ("nop")
 
 // ENC28J60 Control Registers
 // Control register definitions are a combination of address,
@@ -263,8 +262,6 @@
 #define ETHERNET_MIN_PACKET_LENGTH	0x3C
 //#define ETHERNET_HEADER_LENGTH		0x0E
 
-
-
 // MAC address for this interface
 #ifdef ETHADDR0
 #define ENC28J60_MAC0 ETHADDR0
@@ -282,10 +279,7 @@
 #define ENC28J60_MAC5 0xc2
 #endif
 
-
 // functions
-
-
 // setup ports for I/O
 
 void nicSetMacAddress(const uint8_t* macaddr);
@@ -316,7 +310,7 @@ void enc28j60Init(void);
 /// Sends a packet on the network.  It is assumed that the packet is headed by a valid ethernet header.
 /// \param len		Length of packet in bytes.
 /// \param packet	Pointer to packet data.
-void enc28j60PacketSend(unsigned int len, unsigned char* packet);
+void enc28j60PacketSend(uint16_t len, unsigned char* packet);
 
 //! Packet receive function.
 /// Gets a packet from the network receive buffer, if one is available.
@@ -324,11 +318,7 @@ void enc28j60PacketSend(unsigned int len, unsigned char* packet);
 /// \param	maxlen	The maximum acceptable length of a retrieved packet.
 /// \param	packet	Pointer where packet data should be stored.
 /// \return Packet length in bytes if a packet was retrieved, zero otherwise.
-unsigned int enc28j60PacketReceive(unsigned int maxlen, unsigned char* packet);
-
-
-
-
+uint16_t enc28j60PacketReceive(uint16_t maxlen, unsigned char* packet);
 
 #endif
 //@}

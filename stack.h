@@ -4,9 +4,9 @@
 #define STACK_H
 
 extern struct ETH_frame *eth(unsigned char *buff);
-extern struct IP_segment *ip(struct ETH_frame *frame);
+extern struct IP_segment *ip(uint16_t length, struct ETH_frame *frame);
 extern void arp(uint8_t len, unsigned char *buff);
-extern void udp(uint8_t len, unsigned char *buff);
+extern void udp(uint16_t len, unsigned char *buff);
 extern void icmp(uint8_t len, unsigned char *buff);
 extern uint8_t compare_macs(uint8_t mac0[6], uint8_t mac1[6]);
 extern uint8_t compare_ips(uint8_t ip0[4], uint8_t ip1[4]);
@@ -15,7 +15,7 @@ extern uint16_t ntohs(uint16_t hostshort);
 
 
 /*Buffer Grösse*/
-#define BUFFER_SIZE 512
+#define BUFFER_SIZE 128
 unsigned char buffer[BUFFER_SIZE];
 
 extern const uint8_t mymac[6];
@@ -44,8 +44,12 @@ extern const uint8_t BROADCAST_MAC[6];
 #define TYPE_ICMP 0x01
 
 // ethertypes
-#define TYPE_IP 0x8000
+#define TYPE_IP4 0x0800
+#define TYPE_IP6 0x86DD
 #define TYPE_ARP 0x0806
+#define TYPE_WOL 0x0842
+#define TYPE_APPLETALK 0x809B
+#define TYPE_VLAN 0x8100
 
 struct ETH_frame {
 	uint8_t destMac[6];
@@ -69,17 +73,18 @@ struct ARP_packet {
 struct IP_segment {
 	uint8_t version : 4;
 	uint8_t ihl : 4;
-	uint8_t tos;
+	uint8_t dscp : 6;
+	uint8_t ecn : 2;
 	uint16_t length;
 	uint16_t identification;
 	uint8_t flags: 2;
 	uint16_t offset : 14;
-	uint8_t ttl : 4;
-	uint8_t protocol : 4;
+	uint8_t ttl;
+	uint8_t protocol;
 	uint16_t checksum;
 	uint8_t sourceIp[4];
 	uint8_t destIp[4];
-//	uint8_t padding[ihl];
+//	uint8_t options[ihl];
 	uint8_t payload[BUFFER_SIZE-ETH_HEADERLENGTH-IP_HEADERLENGTH];
 };
 
