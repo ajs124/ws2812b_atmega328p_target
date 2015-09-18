@@ -20,18 +20,19 @@
 #include "enc28j60.h"
 #include <avr/io.h>
 #if DEBUG
-    #include "uart.h"
+	#include "uart.h"
 	#include "util.h"
+	#include <stdlib.h>
 #endif
 
 uint8_t Enc28j60Bank;
 uint16_t NextPacketPtr;
+uint8_t FlowControlEnable = 0;
 #define ENC28J60_CONTROL_PORT	PORTD
 #define ENC28J60_CONTROL_DDR	DDRD
 #define ENC28J60_CONTROL_CS		4
 
-void nicSetMacAddress(const uint8_t* macaddr)
-{
+void nicSetMacAddress(const uint8_t* macaddr) {
 	// write MAC address
 	// NOTE: MAC address in ENC28J60 is byte-backward
 	enc28j60Write(MAADR5, *macaddr++);
@@ -42,11 +43,9 @@ void nicSetMacAddress(const uint8_t* macaddr)
 	enc28j60Write(MAADR0, *macaddr++);
 }
 
-
-uint8_t enc28j60ReadOp(uint8_t op, uint8_t address)
-{
+uint8_t enc28j60ReadOp(uint8_t op, uint8_t address) {
 	uint8_t data;
-   
+
 	// assert CS
 	ENC28J60_CONTROL_PORT &= ~(1<<ENC28J60_CONTROL_CS);
 	
@@ -83,8 +82,7 @@ uint8_t enc28j60ReadOp(uint8_t op, uint8_t address)
 	return data;
 }
 
-void enc28j60WriteOp(uint8_t op, uint8_t address, uint8_t data)
-{
+void enc28j60WriteOp(uint8_t op, uint8_t address, uint8_t data) {
 	// assert CS
 	ENC28J60_CONTROL_PORT &= ~(1<<ENC28J60_CONTROL_CS);
 
@@ -112,8 +110,7 @@ void enc28j60WriteOp(uint8_t op, uint8_t address, uint8_t data)
 #endif*/
 }
 
-void enc28j60ReadBuffer(uint16_t len, uint8_t* data)
-{
+void enc28j60ReadBuffer(uint16_t len, uint8_t* data) {
 	// assert CS
 	ENC28J60_CONTROL_PORT &= ~(1<<ENC28J60_CONTROL_CS);
 	
@@ -131,8 +128,7 @@ void enc28j60ReadBuffer(uint16_t len, uint8_t* data)
 	ENC28J60_CONTROL_PORT |= (1<<ENC28J60_CONTROL_CS);
 }
 
-void enc28j60WriteBuffer(uint16_t len, uint8_t* data)
-{
+void enc28j60WriteBuffer(uint16_t len, uint8_t* data) {
 	// assert CS
 	ENC28J60_CONTROL_PORT &= ~(1<<ENC28J60_CONTROL_CS);
 	
@@ -149,8 +145,7 @@ void enc28j60WriteBuffer(uint16_t len, uint8_t* data)
 	ENC28J60_CONTROL_PORT |= (1<<ENC28J60_CONTROL_CS);
 }
 
-void enc28j60SetBank(uint8_t address)
-{
+void enc28j60SetBank(uint8_t address) {
 	// set the bank (if needed)
 	if((address & BANK_MASK) != Enc28j60Bank)
 	{
@@ -177,10 +172,7 @@ void enc28j60Write(uint8_t address, uint8_t data)
 	enc28j60WriteOp(ENC28J60_WRITE_CTRL_REG, address, data);
 }
 
-
-
-void enc28j60PhyWrite(uint8_t address, uint16_t data)
-{
+void enc28j60PhyWrite(uint8_t address, uint16_t data) {
 	// set the PHY register address
 	enc28j60Write(MIREGADR, address);
 	
@@ -192,10 +184,8 @@ void enc28j60PhyWrite(uint8_t address, uint16_t data)
 	while(enc28j60Read(MISTAT) & MISTAT_BUSY);
 }
 
-void enc28j60Init(void)
-{
+void enc28j60Init(void) {
 	// initialize I/O
-
 	ENC28J60_CONTROL_DDR |= 1<<ENC28J60_CONTROL_CS;
 	ENC28J60_CONTROL_PORT |= 1<<ENC28J60_CONTROL_CS;
 
@@ -237,8 +227,8 @@ void enc28j60Init(void)
 	enc28j60Write(MACON1, MACON1_MARXEN|MACON1_TXPAUS|MACON1_RXPAUS);
 	// bring MAC out of reset
 	enc28j60Write(MACON2, 0x00);
-	// enable automatic padding and CRC operations
-	enc28j60WriteOp(ENC28J60_BIT_FIELD_SET, MACON3, MACON3_PADCFG0|MACON3_TXCRCEN|MACON3_FRMLNEN);
+	// enable automatic padding, CRC operations and full duplex (part1)
+	enc28j60WriteOp(ENC28J60_BIT_FIELD_SET, MACON3, MACON3_PADCFG0|MACON3_TXCRCEN|MACON3_FRMLNEN|MACON3_FULDPX);
 
 	// set inter-frame gap (non-back-to-back)
 	enc28j60Write(MAIPGL, 0x12);
@@ -261,17 +251,21 @@ void enc28j60Init(void)
 
 	// no loopback of transmitted frames
 	enc28j60PhyWrite(PHCON2, PHCON2_HDLDIS);
+	// full duplex (part2)
+	enc28j60PhyWrite(PHCON1, PHCON1_PDPXMD);
 
 	// set up some filters. We accept unicasts and broadcasts, but only if their CRC is ok (see page 47/chapter 8 of the manual)
 	enc28j60Write(ERXFCON, ERXFCON_UCEN | ERXFCON_BCEN | ERXFCON_CRCEN);
 
+	// maximum pause time for flow control
+	enc28j60Write(EPAUSL, 0xFF);
+	enc28j60Write(EPAUSH, 0xFF);
 	// switch to bank 0
 	enc28j60SetBank(ECON1);
 	// enable interrutps
 //	enc28j60WriteOp(ENC28J60_BIT_FIELD_SET, EIE, EIE_INTIE|EIE_PKTIE);
 	// enable packet reception
 	enc28j60WriteOp(ENC28J60_BIT_FIELD_SET, ECON1, ECON1_RXEN);
-
 }
 
 void enc28j60PacketSend(uint16_t len, unsigned char* packet) {
@@ -287,24 +281,26 @@ void enc28j60PacketSend(uint16_t len, unsigned char* packet) {
 
 	// copy the packet into the transmit buffer
 	enc28j60WriteBuffer(len, packet);
-	
+
 	// send the contents of the transmit buffer onto the network
 	enc28j60WriteOp(ENC28J60_BIT_FIELD_SET, ECON1, ECON1_TXRTS);
+/*	if(enc28j60Read()) {
+		uart_puts("Error occured why transmitting package\r\n");
+	}*/
 }
 
-uint16_t enc28j60PacketReceive(uint16_t maxlen, unsigned char* packet) {
-	uint16_t rxstat;
+uint16_t enc28j60PacketReceive(uint16_t maxlen, unsigned char* packet, uint16_t *rxstat) {
 	uint16_t len;
 
 	// check if a packet has been received and buffered
-	if( !(enc28j60Read(EIR) & EIR_PKTIF) )
+	if(!(enc28j60Read(EIR) & EIR_PKTIF))
 		return 0;
 	
-	// Make absolutely certain that any previous packet was discarded	
+	// Make absolutely certain that any previous packet was discarded
 	//if( WasDiscarded == FALSE)
 	//	MACDiscardRx();
 
-	// Set the read pointer to the start of the received packet
+	// Set the read pointer to the start of the received packet (AUTOINC?)
 	enc28j60Write(ERDPTL, (NextPacketPtr));
 	enc28j60Write(ERDPTH, (NextPacketPtr)>>8);
 	// read the next packet pointer
@@ -314,9 +310,12 @@ uint16_t enc28j60PacketReceive(uint16_t maxlen, unsigned char* packet) {
 	len  = enc28j60ReadOp(ENC28J60_READ_BUF_MEM, 0);
 	len |= enc28j60ReadOp(ENC28J60_READ_BUF_MEM, 0)<<8;
 	// read the receive status
-	rxstat  = enc28j60ReadOp(ENC28J60_READ_BUF_MEM, 0);
-	rxstat |= enc28j60ReadOp(ENC28J60_READ_BUF_MEM, 0)<<8;
+	*rxstat  = enc28j60ReadOp(ENC28J60_READ_BUF_MEM, 0);
+	*rxstat |= enc28j60ReadOp(ENC28J60_READ_BUF_MEM, 0)<<8;
 
+	if(*rxstat & RXSTAT_LONG_DROP_EVENT) {
+		uart_puts("PACKET DROPPED! (or \"long event)\"\r\n");
+	}
 	// limit retrieve length
 	// (we reduce the MAC-reported length by 4 to remove the CRC)
 	len = MIN(len, maxlen);
@@ -332,9 +331,31 @@ uint16_t enc28j60PacketReceive(uint16_t maxlen, unsigned char* packet) {
 	// decrement the packet counter indicate we are done with this packet
 	enc28j60WriteOp(ENC28J60_BIT_FIELD_SET, ECON2, ECON2_PKTDEC);
 
+	uint8_t pkt_cnt = enc28j60Read(EPKTCNT);
+	if(!FlowControlEnable && pkt_cnt > 16) {
+		enc28j60FlowControl(1);
+	} else if (FlowControlEnable && pkt_cnt < 10) {
+		enc28j60FlowControl(0);
+	}
+	if(enc28j60Read(EIR) & EIR_RXERIF) {
+		uart_puts("there was a receive error\r\n");
+		enc28j60WriteOp(ENC28J60_BIT_FIELD_CLR, EIR, EIR_RXERIF);
+	}
+	char buf[8];
+	utoa(pkt_cnt, buf, 10);
+	uart_puts(buf);
+	uart_puts(" packets in rx buf\r\n");
 	return len;
 }
 
-
-
-
+void enc28j60FlowControl(uint8_t enable) {
+	// manual page 56
+	if(enable) {
+		enc28j60WriteOp(ENC28J60_BIT_FIELD_SET, EFLOCON, 0x02);
+		uart_puts("flow control enabled\r\n");
+	} else {
+		enc28j60WriteOp(ENC28J60_BIT_FIELD_SET, EFLOCON, 0x03);
+		uart_puts("flow control disabled\r\n");
+	}
+	FlowControlEnable = enable;
+}

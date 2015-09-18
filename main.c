@@ -19,7 +19,7 @@
 int main(void){
 	init_uart();
 	
-	uint16_t packet_length;
+	uint16_t packet_length, rxstat;
 	
 	uart_puts("beginning startup procedure\r\n");    
 	/*ENC Initialisieren*/
@@ -46,15 +46,15 @@ int main(void){
 	
 	while(1) {
 		// Buffer des Enc's abhohlen :-)
-		packet_length = enc28j60PacketReceive(BUFFER_SIZE, buffer);
-		
+		packet_length = enc28j60PacketReceive(BUFFER_SIZE, buffer, &rxstat);
+
 		// Wenn ein Packet angekommen ist, ist packet_length =! 0
 		if(packet_length) {
 			packet_length -= 4;
 			struct ETH_frame *frame = (struct ETH_frame *) buffer;
 			frame->type_length = ntohs(frame->type_length);
-			// arping uses unicast after the first by default
-			if((compare_macs(frame->destMac, (uint8_t *) BROADCAST_MAC) || compare_macs(frame->destMac, (uint8_t *) mymac)) && frame->type_length == TYPE_ARP) {
+			// arping uses unicast after the first by default, but we don't care because performance
+			if(/*(*/rxstat&BROADCAST_BIT /*|| compare_macs(frame->destMac, (uint8_t *) mymac))*/ && frame->type_length == TYPE_ARP) {
 				struct ARP_packet *arp_pkt = (struct ARP_packet *) frame->payload;
 				if(compare_ips(arp_pkt->destIp, (uint8_t *) myip)) {
 					arp(packet_length, buffer);
@@ -70,7 +70,6 @@ int main(void){
 						continue;
 					} else if(ip->protocol == TYPE_UDP) {
 						struct UDP_packet *pkt = (struct UDP_packet *) ip->payload;
-						pkt->length = pkt->length;
 						pkt->destPort = pkt->destPort;
 						pkt->sourcePort = pkt->sourcePort;
 
@@ -89,6 +88,15 @@ int main(void){
 							uart_puts((char*) pkt->data);
 							uart_puts("\r\n");
 							continue;
+						}
+					} else if(ip->protocol == TYPE_TCP) {
+						uart_puts("received tcp package!\r\n");
+						#if DEBUG
+						hexdump(ip, 256);
+						#endif
+						struct TCP_segment *tcp = (struct TCP_segment *) ip->payload;
+						if(tcp->sourcePort == ntohs(7)) {
+
 						}
 					}
 				}

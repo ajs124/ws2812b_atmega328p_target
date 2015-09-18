@@ -3,7 +3,7 @@
 #include "util.h"
 
 const uint8_t mymac[6] = {0x02,0x05,0x69,0x55,0x1c,0xc2};
-const uint8_t myip[4] = {192,168,1,96};
+const uint8_t myip[4] = {192,168,2,96};
 const uint8_t BROADCAST_MAC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 /*#######################################################
@@ -42,7 +42,7 @@ uint16_t checksum(uint16_t len, char *pointer) {
 		result16_1 = (DataH << 8);
 		//Addiert packet mit vorherigen
 		result32 = result32 + result16_1;
- 	}
+	}
 	
 	//Komplementbildung (addiert Long INT_H Byte mit Long INT L Byte)
 	result32 = ((result32 & 0x0000FFFF)+ ((result32 & 0xFFFF0000) >> 16));
@@ -140,8 +140,7 @@ void icmp(uint8_t len, unsigned char *buff){
 	enc28j60PacketSend(len, buff);
 }
 
-/*UDP Funktion, beliebige Antwort
-####################################################################################*/
+// UDP Funktion, beliebige Antwort
 void udp(uint16_t len, unsigned char *buff){ 
 	// ETHERNET II header erzeugen
 	struct ETH_frame *frame = eth(buff);

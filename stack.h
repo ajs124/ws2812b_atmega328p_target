@@ -14,23 +14,21 @@ extern uint16_t htons(uint16_t hostshort);
 extern uint16_t ntohs(uint16_t hostshort);
 
 
-/*Buffer Grösse*/
-#define BUFFER_SIZE 128
+// size chosen by expriment. this works for returning all packets send with nc -u, because linux spilts at 1066 bytes per frame
+#define BUFFER_SIZE 1100
 unsigned char buffer[BUFFER_SIZE];
 
 extern const uint8_t mymac[6];
 extern const uint8_t myip[4];
 extern const uint8_t BROADCAST_MAC[6];
 
+#define BROADCAST_BIT 512
+
 #define PORT_HTTP 80
 #define PORT_FTP 21
 
 
-/*-------------------------------------------
-
-	STACK.C Structs
-
--------------------------------------------*/
+// STACK.C Structs
 #define ETH_HEADERLENGTH 14
 #define IP_HEADERLENGTH 20
 #define ICMP_HEADERLENGTH 8
@@ -101,6 +99,10 @@ struct UDP_packet {
 	uint16_t length;
 	uint16_t checksum;
 	unsigned char data[BUFFER_SIZE-ETH_HEADERLENGTH-IP_UDP_HEADERLENGTH];
+};
+
+struct TCP_segment {
+	uint16_t sourcePort;
 };
 
 #endif

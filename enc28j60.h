@@ -239,6 +239,9 @@
 #define PKTCTRL_PCRCEN		0x02
 #define PKTCTRL_POVERRIDE	0x01
 
+// ENC28J60 RECEIVE STATUS VECTORS (page 44)
+#define RXSTAT_LONG_DROP_EVENT 0x01
+
 // SPI operation codes
 #define ENC28J60_READ_CTRL_REG	0x00
 #define ENC28J60_READ_BUF_MEM	0x3A
@@ -330,7 +333,9 @@ void enc28j60PacketSend(uint16_t len, unsigned char* packet);
 /// \param	maxlen	The maximum acceptable length of a retrieved packet.
 /// \param	packet	Pointer where packet data should be stored.
 /// \return Packet length in bytes if a packet was retrieved, zero otherwise.
-uint16_t enc28j60PacketReceive(uint16_t maxlen, unsigned char* packet);
+uint16_t enc28j60PacketReceive(uint16_t maxlen, unsigned char* packet, uint16_t *rxstat);
+
+void enc28j60FlowControl(uint8_t enable);
 
 #endif
 //@}
