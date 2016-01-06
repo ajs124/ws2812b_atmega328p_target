@@ -13,7 +13,7 @@
 
 DEVICE     = atmega328p
 PROGRAMMER = -c usbasp
-OBJECTS    = util.o uart.o enc28j60.o stack.o main.o
+OBJECTS    = uart.o main.o ws2812b.o idle.o
 # 8 MHz
 #FUSES      = -U lfuse:w:0xe2:m -U hfuse:w:0xd9:m  
 DEBUG      ?= 0
@@ -24,7 +24,7 @@ DEBUG      ?= 0
 # Tune the lines below only if you know what you are doing:
 
 AVRDUDE = avrdude $(PROGRAMMER) -p m328p -v
-COMPILE = avr-gcc -std=c99 -Wall -Werror -fpack-struct -Os -mmcu=$(DEVICE) -DDEBUG=$(DEBUG) -DF_CPU=8000000UL -I.
+COMPILE = avr-gcc -std=gnu99 -Wall -Werror -fpack-struct -Os -mmcu=$(DEVICE) -DDEBUG=$(DEBUG) -DF_CPU=16000000UL -I.
 
 # symbolic targets:
 all:	main.hex
