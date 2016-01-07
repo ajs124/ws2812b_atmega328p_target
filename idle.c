@@ -4,26 +4,32 @@
 #include "idle.h"
 #include "ws2812b.h"
 
+#define IDLE_TIME 16 // in seconds
+#define WAITS (((int)(IDLE_TIME/4.2))+1) // timer overflows after ~4.2s, see init
+
 void pretty_shutdown() {
     // find last led with data
-    uint16_t last = numleds;
-    while(leds[last--] == 0);
-    while(last > 0) {
-        // shift array down by one
-        for(uint16_t i=1; i <= last; i++) {
-            leds[i-1] = leds[i];
+    uint16_t last = numleds*3;
+    while(!leds[last--] && !leds[last--] && !leds[last--]);
+    last++;
+    while(last > 3 && idle_counter >= WAITS) {
+        // shift array down by three
+        for(uint16_t i=3; i < last-3; i++) {
+            leds[i-3] = leds[i];
         }
         leds[last] = 0;
+        leds[last-1] = 0;
+        leds[last-2] = 0;
+        last -= 3;
         ws2812b_show();
         _delay_ms(3);
-        last--;
     }
 }
 
 ISR(TIMER1_OVF_vect) {
-    if(++idle_counter >= 7) {
+    if(++idle_counter >= WAITS ) {
         pretty_shutdown();
-        if(idle_counter >= 7) {
+        if(idle_counter >= WAITS) {
             psu_off();
         }
     }
