@@ -1,10 +1,31 @@
 #include <avr/interrupt.h>
+#include <util/delay.h>
 #include "psu.h"
 #include "idle.h"
+#include "ws2812b.h"
+
+void pretty_shutdown() {
+    // find last led with data
+    uint16_t last = numleds;
+    while(leds[last--] == 0);
+    while(last > 0) {
+        // shift array down by one
+        for(uint16_t i=1; i <= last; i++) {
+            leds[i-1] = leds[i];
+        }
+        leds[last] = 0;
+        ws2812b_show();
+        _delay_ms(3);
+        last--;
+    }
+}
 
 ISR(TIMER1_OVF_vect) {
     if(++idle_counter >= 7) {
-        psu_off();
+        pretty_shutdown();
+        if(idle_counter >= 7) {
+            psu_off();
+        }
     }
 }
 
