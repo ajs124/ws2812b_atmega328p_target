@@ -36,7 +36,7 @@ ISR(USART_RX_vect) {
         ws2812b_show();
     } else if (temp == 0xFE) {
         psu_off();
-    } else {
+    } else if(current < numleds) { // protect against overflow
         leds[current++] = temp;
     }
 }
