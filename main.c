@@ -11,15 +11,15 @@ void init_io() {
 }
 
 int main(void){
-	init_uart();
+    init_uart();
 	
-	uart_puts("beginning startup procedure\r\n");    
+    uart_puts("beginning startup procedure\r\n");
     init_io();
     ws2812b_init();
-	init_timer1();
+    init_timer1();
     uart_puts("initialization finished\r\n");
+
+    uart_loop();
 	
-	while(1); // everything is done with interrupts
-	
-	return 1;
+    return 1;
 }
