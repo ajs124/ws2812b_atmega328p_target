@@ -10,8 +10,8 @@
 void pretty_shutdown() {
     // find last led with data
     uint16_t last = numleds*3;
-    while(!leds[last--] && !leds[last--] && !leds[last--]);
-    last++;
+    while(!leds[last] && !leds[last-1] && !leds[last-2])
+	last-=3;
     while(last > 3 && idle_counter >= WAITS) {
         // shift array down by three
         for(uint16_t i=3; i < last-3; i++) {
@@ -37,7 +37,6 @@ ISR(TIMER1_OVF_vect) {
 
 void init_timer1() {
     TCCR1B |= (1 << CS12) | (1 << CS10); // prescale F_CPU/1024
-    TCNT1 = 0;                 // overflow afer ~4.2s. ((16*10^6)/1024)^-1*2^16=4.194...
-    idle_counter = 1;
+    reset_idle();
     TIMSK1 |= (1 << TOIE2); // Enable overflow interrupt
 }
