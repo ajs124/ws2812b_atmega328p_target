@@ -13,6 +13,7 @@ void pretty_shutdown() {
     while(!leds[last] && !leds[last-1] && !leds[last-2])
 	last-=3;
     while(last > 3 && idle_counter >= WAITS) {
+        if(idle_counter <= WAITS) return; // shutdown aborted?
         // shift array down by three
         for(uint16_t i=3; i < last-3; i++) {
             leds[i-3] = leds[i];

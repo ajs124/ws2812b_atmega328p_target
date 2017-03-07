@@ -18,7 +18,7 @@ void uart_putc(unsigned char c) {
     UCSR0B &= ~(1<<TXEN0);
 }
  
-void uart_puts (char *s) {
+void uart_puts(char *s) {
     while (*s) {
         uart_putc(*s);
         ++s;
@@ -26,9 +26,10 @@ void uart_puts (char *s) {
 }
 
 void uart_loop() {
+    uint8_t temp;
     while(1) {
         while(!(UCSR0A & (1<<RXC0)));
-        uint8_t temp = UDR0;
+        temp = UDR0;
         // reset timer
         reset_idle();
         if(temp == 0xFF) {
