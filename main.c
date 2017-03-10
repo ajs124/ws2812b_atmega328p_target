@@ -16,7 +16,9 @@ int main(void){
     uart_puts("beginning startup procedure\r\n");
     init_io();
     ws2812b_init();
+#if numleds > 550
     init_timer1();
+#endif
     uart_puts("initialization finished\r\n");
 
     uart_loop();

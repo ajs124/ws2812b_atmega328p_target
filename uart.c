@@ -31,7 +31,9 @@ void uart_loop() {
         while(!(UCSR0A & (1<<RXC0)));
         temp = UDR0;
         // reset timer
+#if NUM_LEDS > 550
         reset_idle();
+#endif
         if(temp == 0xFF) {
             // frame finished
             current = 0;

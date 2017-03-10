@@ -7,6 +7,7 @@
 #define IDLE_TIME 16 // in seconds
 #define WAITS (((int)(IDLE_TIME/4.2))+1) // timer overflows after ~4.2s, see init
 
+#if numleds > 550
 void pretty_shutdown() {
     // find last led with data
     uint16_t last = numleds*3;
@@ -41,3 +42,4 @@ void init_timer1() {
     reset_idle();
     TIMSK1 |= (1 << TOIE2); // Enable overflow interrupt
 }
+#endif

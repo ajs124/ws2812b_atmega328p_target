@@ -28,6 +28,10 @@
 #include <avr/interrupt.h>
 #include "ws2812b.h"
 
+#if numleds > 650
+    #error Number of LEDs over 650, this will most definitly not fit in memory, sorry
+#endif
+
 uint8_t reset_time_over;
 
 void startTimer();
